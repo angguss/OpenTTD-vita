@@ -17,7 +17,10 @@
 
 #include <errno.h>
 #include <signal.h>
+
+#if !defined(PSVITA)
 #include <sys/utsname.h>
+#endif
 
 #if defined(__GLIBC__)
 /* Execinfo (and thus making stacktraces) is a GNU extension */
@@ -40,6 +43,14 @@ class CrashLogUnix : public CrashLog {
 	/** Signal that has been thrown. */
 	int signum;
 
+#if defined(PSVITA)
+	char *LogOSVersion(char *buffer, const char *last) const
+	{
+		return buffer + seprintf(buffer, last, 
+			"Operating system: %s\n",
+			"PS Vita");
+	}
+#else
 	/* virtual */ char *LogOSVersion(char *buffer, const char *last) const
 	{
 		struct utsname name;
@@ -59,6 +70,7 @@ class CrashLogUnix : public CrashLog {
 				name.machine
 		);
 	}
+#endif
 
 	/* virtual */ char *LogError(char *buffer, const char *last, const char *message) const
 	{

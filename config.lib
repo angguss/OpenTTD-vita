@@ -538,10 +538,10 @@ check_params() {
 		log 1 " PREPROCESSOR is only available for OSX"
 		exit 1
 	fi
-	# OS only allows DETECT, UNIX, OSX, FREEBSD, DRAGONFLY, OPENBSD, NETBSD, MORPHOS, BEOS, HAIKU, SUNOS, CYGWIN, MINGW, OS2, DOS, WINCE, and PSP
-	if [ -z "`echo $os | egrep '^(DETECT|UNIX|OSX|FREEBSD|DRAGONFLY|OPENBSD|NETBSD|HPUX|MORPHOS|BEOS|HAIKU|SUNOS|CYGWIN|MINGW|OS2|DOS|WINCE|PSP)$'`" ]; then
+	# OS only allows DETECT, UNIX, OSX, FREEBSD, DRAGONFLY, OPENBSD, NETBSD, MORPHOS, BEOS, HAIKU, SUNOS, CYGWIN, MINGW, OS2, DOS, WINCE, PSP and PSVITA
+	if [ -z "`echo $os | egrep '^(DETECT|UNIX|OSX|FREEBSD|DRAGONFLY|OPENBSD|NETBSD|HPUX|MORPHOS|BEOS|HAIKU|SUNOS|CYGWIN|MINGW|OS2|DOS|WINCE|PSP|PSVITA)$'`" ]; then
 		log 1 "configure: error: invalid option --os=$os"
-		log 1 " Available options are: --os=[DETECT|UNIX|OSX|FREEBSD|DRAGONFLY|OPENBSD|NETBSD|HPUX|MORPHOS|BEOS|HAIKU|SUNOS|CYGWIN|MINGW|OS2|DOS|WINCE|PSP]"
+		log 1 " Available options are: --os=[DETECT|UNIX|OSX|FREEBSD|DRAGONFLY|OPENBSD|NETBSD|HPUX|MORPHOS|BEOS|HAIKU|SUNOS|CYGWIN|MINGW|OS2|DOS|WINCE|PSP|PSVITA]"
 		exit 1
 	fi
 	# cpu_type can be either 32 or 64
@@ -1585,6 +1585,14 @@ make_cflags_and_ldflags() {
 		LIBS="$LIBS -D_PSP_FW_VERSION=150 -lpspdebug -lpspdisplay -lpspge -lpspctrl -lpspsdk -lpspnet -lpspnet_inet -lpspnet_apctl -lpspnet_resolver -lpsputility -lpspuser -lpspkernel -lm"
 	fi
 
+	if [ "$os" = "PSVITA" ]; then
+		CFLAGS="-Wl,-q $CFLAGS -mfpu=neon -mcpu=cortex-a9 -march=armv7-a -mfloat-abi=hard -Wl,-q"
+		CXXFLAGS="$CXXFLAGS -Wl,-q"
+		# TODO: This needs to be autoconfigured properly (mostly SDL)
+		LIBS="$LIBS -lSDL2 -lvita2d -lSceGxm_stub -lSceSysmodule_stub -lSceCtrl_stub -lSceDisplay_stub -lSceCommonDialog_stub -lSceAudio_stub -ldebugnet -lSceNetCtl_stub -lSceTouch_stub"
+		LDFLAGS="$LDFLAGS -Wl,-z,nocopyreloc -Wl,-q"
+	fi
+
 	if [ "$os" = "MORPHOS" ]; then
 		# -Wstrict-prototypes generates much noise because of system headers
 		CFLAGS="$CFLAGS -Wno-strict-prototypes"
@@ -2428,7 +2436,12 @@ detect_sdl() {
 		sleep 5
 	fi
 
-	detect_pkg_config "$with_sdl" "sdl" "sdl_config" "1.2"
+	if [ "$os" = "PSVITA" ]; then
+		log 1 "Using SDL2 because OS is PSVITA"
+		detect_pkg_config "$with_sdl" "sdl2" "sdl_config" "1.2"
+	else
+		detect_pkg_config "$with_sdl" "sdl" "sdl_config" "1.2"
+	fi
 }
 
 detect_osx_sdk() {

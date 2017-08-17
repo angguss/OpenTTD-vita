@@ -70,6 +70,13 @@
 
 #include "safeguards.h"
 
+#ifdef PSVITA
+#include <debugnet.h>
+// redefine the DEBUG macro for the vita since there's no console output,
+// we can capture these messages in socat
+#define DEBUG(arga, argv, ...) debugNetPrintf(DBGN_INFO, __VA_ARGS__)
+#endif
+
 void CallLandscapeTick();
 void IncreaseDate();
 void DoPaletteAnimations();
@@ -87,6 +94,48 @@ extern char *_config_file;
  * @param s the string to print.
  * @note Does NEVER return.
  */
+
+// Vita has no console so we'll forward it all over debugnet
+#if defined(PSVITA)
+
+void CDECL usererror(const char *s, ...)
+{
+	va_list va;
+	char buf[512];
+
+	va_start(va, s);
+	vseprintf(buf, lastof(buf), s, va);
+	va_end(va);
+
+	debugNetPrintf(DBGN_INFO, "usererror: %s\n", buf);
+}
+
+void CDECL error(const char *s, ...)
+{
+	va_list va;
+	char buf[512];
+
+	va_start(va, s);
+	vseprintf(buf, lastof(buf), s, va);
+	va_end(va);
+
+	debugNetPrintf(DBGN_INFO, "error: %s\n", buf);
+}
+
+void CDECL ShowInfoF(const char *s, ...)
+{
+	va_list va;
+	char buf[512];
+
+	va_start(va, s);
+	vseprintf(buf, lastof(buf), s, va);
+	va_end(va);
+
+	debugNetPrintf(DBGN_INFO, "ShowInfoF: %s\n", buf);
+}
+
+#else
+
 void CDECL usererror(const char *s, ...)
 {
 	va_list va;
@@ -137,6 +186,7 @@ void CDECL ShowInfoF(const char *str, ...)
 	ShowInfo(buf);
 }
 
+#endif
 /**
  * Show the help message when someone passed a wrong parameter.
  */
@@ -558,7 +608,6 @@ int openttd_main(int argc, char *argv[])
 
 	GetOptData mgo(argc - 1, argv + 1, _options);
 	int ret = 0;
-
 	int i;
 	while ((i = mgo.GetOpt()) != -1) {
 		switch (i) {
@@ -676,6 +725,10 @@ int openttd_main(int argc, char *argv[])
 		if (i == -2) break;
 	}
 
+#if defined(PSVITA)
+	debugNetPrintf(DBGN_INFO, "Finished scanning opts\n");
+#endif
+
 	if (i == -2 || mgo.numleft > 0) {
 		/* Either the user typed '-h', he made an error, or he added unrecognized command line arguments.
 		 * In all cases, print the help, and exit.
@@ -697,7 +750,14 @@ int openttd_main(int argc, char *argv[])
 	SetDebugString("4");
 #endif
 
+
+#if defined(PSVITA)
+	// TODO: Use shared paths here instead of hardcoded.
+	// argv[0] is NULL on vita, will crash
+	DeterminePaths("ux0:/data/openttd/");
+#else
 	DeterminePaths(argv[0]);
+#endif
 	TarScanner::DoScan(TarScanner::BASESET);
 
 #if defined(ENABLE_NETWORK)
@@ -755,6 +815,10 @@ int openttd_main(int argc, char *argv[])
 	GfxInitPalettes();
 
 	DEBUG(misc, 1, "Loading blitter...");
+#ifdef PSVITA
+	// Force the 8bpp blitter, anything else is too slow
+	blitter = "8bpp-optimized";
+#endif
 	if (blitter == NULL && _ini_blitter != NULL) blitter = stredup(_ini_blitter);
 	_blitter_autodetected = StrEmpty(blitter);
 	/* Activate the initial blitter.

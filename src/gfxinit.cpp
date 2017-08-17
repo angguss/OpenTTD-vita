@@ -343,7 +343,7 @@ void GfxLoadSprites()
 	GfxInitSpriteMem();
 	LoadSpriteTables();
 	GfxInitPalettes();
-
+	
 	UpdateCursorSize();
 }
 

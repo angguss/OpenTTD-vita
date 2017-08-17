@@ -12,6 +12,10 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#if defined(__vita__)
+#include <debugnet.h>
+#endif
+
 #include "cpu.h"
 
 /* Debugging messages policy:
@@ -37,6 +41,7 @@
 	 * @param level Debugging level, higher levels means more detailed information.
 	 */
 	#define DEBUG(name, level, ...) if ((level) == 0 || _debug_ ## name ## _level >= (level)) debug(#name, __VA_ARGS__)
+	//#define DEBUG(name, level, ...) debug(#name, __VA_ARGS__)
 
 	extern int _debug_driver_level;
 	extern int _debug_grf_level;

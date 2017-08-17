@@ -28,6 +28,10 @@
 #include <sys/stat.h>
 #include <algorithm>
 
+#ifdef PSVITA
+#include <psp2/io/stat.h>
+#endif
+
 #ifdef WITH_XDG_BASEDIR
 #include "basedir.h"
 #endif
@@ -60,6 +64,42 @@ static bool _do_scan_working_directory = true;
 
 extern char *_config_file;
 extern char *_highscore_file;
+
+
+#if defined(PSVITA)
+DIR opendir(const char *path) {
+	SceUID uid = sceIoDopen(path);
+	return uid;
+}
+
+struct dirent *readdir(DIR d) {
+	struct dirent *dir = MallocT<struct dirent>(1);
+	struct SceIoDirent *sce_dir = MallocT<SceIoDirent>(1);
+
+	if (sceIoDread(d, sce_dir) < 0)
+	{
+		return NULL;
+	}
+
+	dir->d_name = sce_dir->d_name;
+	dir->dir = d;
+	dir->dirinfo = sce_dir;
+
+	if (strlen(sce_dir->d_name) <= 0)
+	{
+		free(sce_dir);
+		free(dir);
+		return NULL;
+	}
+
+	return dir;
+}
+
+int closedir(DIR d) {
+	return sceIoDclose(d);
+}
+
+#endif
 
 /**
  * Get position in the current file.
@@ -558,6 +598,8 @@ static void FioCreateDirectory(const char *name)
 	}
 
 	mkdir(OTTD2FS(buf), 0755);
+#elif defined(PSVITA)
+	sceIoMkdir(OTTD2FS(name), 0xFFF);
 #else
 	mkdir(OTTD2FS(name), 0755);
 #endif
@@ -601,7 +643,10 @@ char *BuildWithFullPath(const char *dir)
 
 	/* Add absolute path */
 	if (s == NULL || dest != s) {
-		if (getcwd(dest, MAX_PATH) == NULL) *dest = '\0';
+#ifndef PSVITA
+		if (getcwd(dest, MAX_PATH) == NULL) 
+#endif
+			*dest = '\0';
 		AppendPathSeparator(dest, last);
 		strecat(dest, dir, last);
 	}
@@ -1028,10 +1073,14 @@ extern void DetermineBasePaths(const char *exe);
  * For OSX application bundles '.app' is the required extension of the bundle,
  * so when we crop the path to there, when can remove the name of the bundle
  * in the same way we remove the name from the executable name.
+ * On the Vita, we skip this because unsupported
  * @param exe the path to the executable
  */
 static bool ChangeWorkingDirectoryToExecutable(const char *exe)
 {
+#ifdef PSVITA
+	return true;
+#endif
 	bool success = false;
 #ifdef WITH_COCOA
 	char *app_bundle = strchr(exe, '.');
@@ -1092,6 +1141,16 @@ bool DoScanWorkingDirectory()
  */
 void DetermineBasePaths(const char *exe)
 {
+#if defined(PSVITA)
+	// For now we'll set all of these to ux0. Ideally we need to support
+	// loading from uma0:/ as well but add this later
+	_searchpaths[SP_PERSONAL_DIR] = "ux0:/data/openttd/";
+	_searchpaths[SP_SHARED_DIR] = "ux0:/data/openttd/";
+	_searchpaths[SP_BINARY_DIR] = "ux0:/data/openttd/";
+	_searchpaths[SP_WORKING_DIR] = "ux0:/data/openttd/";
+	_searchpaths[SP_INSTALLATION_DIR] = "ux0:/data/openttd/";
+	return;
+#else
 	char tmp[MAX_PATH];
 #if defined(WITH_XDG_BASEDIR) && defined(WITH_PERSONAL_DIR)
 	const char *xdg_data_home = xdgDataHome(NULL);
@@ -1157,7 +1216,11 @@ void DetermineBasePaths(const char *exe)
 
 	/* Change the working directory to that one of the executable */
 	if (ChangeWorkingDirectoryToExecutable(exe)) {
-		if (getcwd(tmp, MAX_PATH) == NULL) *tmp = '\0';
+	// Skip getcwd for vita, doesn't support
+#if !defined(PSVITA)
+		if (getcwd(tmp, MAX_PATH) == NULL) 
+#endif
+			*tmp = '\0';
 		AppendPathSeparator(tmp, lastof(tmp));
 		_searchpaths[SP_BINARY_DIR] = stredup(tmp);
 	} else {
@@ -1183,6 +1246,7 @@ extern void cocoaSetApplicationBundleDir();
 	cocoaSetApplicationBundleDir();
 #else
 	_searchpaths[SP_APPLICATION_BUNDLE_DIR] = NULL;
+#endif
 #endif
 }
 #endif /* defined(WIN32) || defined(WINCE) */
@@ -1308,6 +1372,7 @@ void DeterminePaths(const char *exe)
 	extern char *_log_file;
 	_log_file = str_fmt("%sopenttd.log",  _personal_dir);
 #else /* ENABLE_NETWORK */
+	
 	/* If we don't have networking, we don't need to make the directory. But
 	 * if it exists we keep it, otherwise remove it from the search paths. */
 	if (!FileExists(_searchpaths[SP_AUTODOWNLOAD_DIR]))  {
@@ -1398,15 +1463,23 @@ static uint ScanPath(FileScanner *fs, const char *extension, const char *path, s
 	uint num = 0;
 	struct stat sb;
 	struct dirent *dirent;
+
+#if defined(PSVITA)
+	DIR dir;
+#else
 	DIR *dir;
-
+#endif
 	if (path == NULL || (dir = ttd_opendir(path)) == NULL) return 0;
-
+	int i = 0;
 	while ((dirent = readdir(dir)) != NULL) {
 		const char *d_name = FS2OTTD(dirent->d_name);
 		char filename[MAX_PATH];
 
 		if (!FiosIsValidFile(path, dirent, &sb)) continue;
+#if defined(PSVITA)
+		free(dirent->dirinfo);
+		free(dirent);
+#endif
 
 		seprintf(filename, lastof(filename), "%s%s", path, d_name);
 

@@ -18,8 +18,15 @@
 #include "../../string_func.h"
 #include "../../fios.h"
 
-
+#if defined(PSVITA)
+#include <psp2/kernel/threadmgr.h>
+#include <psp2/io/dirent.h>
+#include <debugnet.h>
+#include "../../fileio_func.h"
+#else
 #include <dirent.h>
+
+#endif
 #include <unistd.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -260,8 +267,16 @@ void cocoaReleaseAutoreleasePool();
 
 int CDECL main(int argc, char *argv[])
 {
+
+#if defined(PSVITA)
+	// TODO: Make this configurable from openttd cfg
+	int debugnet_ret = debugNetInit("192.168.144.52", 18194, DBGN_DEBUG);
+	debugNetPrintf(DBGN_DEBUG, "Loaded debugnet (%d)\n", debugnet_ret);
+	debugNetPrintf(DBGN_INFO, "Starting main...");
+#else
 	/* Make sure our arguments contain only valid UTF-8 characters. */
 	for (int i = 0; i < argc; i++) ValidateString(argv[i]);
+#endif	
 
 #ifdef WITH_COCOA
 	cocoaSetupAutoreleasePool();
@@ -308,7 +323,7 @@ bool GetClipboardContents(char *buffer, const char *last)
 
 void CSleep(int milliseconds)
 {
-	#if defined(PSP)
+	#if defined(PSP) || defined(PSVITA)
 		sceKernelDelayThread(milliseconds * 1000);
 	#elif defined(__BEOS__)
 		snooze(milliseconds * 1000);
@@ -338,7 +353,7 @@ void CSleep(int milliseconds)
 uint GetCPUCoreCount()
 {
 	uint count = 1;
-#ifdef HAS_SYSCTL
+#if defined(HAS_SYSCTL) && !defined(PSVITA)
 	int ncpu = 0;
 	size_t len = sizeof(ncpu);
 
@@ -356,9 +371,11 @@ uint GetCPUCoreCount()
 #endif /* #ifdef OPENBSD */
 
 	if (ncpu > 0) count = ncpu;
-#elif defined(_SC_NPROCESSORS_ONLN)
+#elif defined(_SC_NPROCESSORS_ONLN) && !defined(PSVITA)
 	long res = sysconf(_SC_NPROCESSORS_ONLN);
 	if (res > 0) count = res;
+#elif defined(__vita__)
+	count = 4;
 #endif
 
 	return count;
@@ -366,6 +383,8 @@ uint GetCPUCoreCount()
 
 void OSOpenBrowser(const char *url)
 {
+// I think this is actually possible on vita, disable for now
+#ifndef PSVITA
 	pid_t child_pid = fork();
 	if (child_pid != 0) return;
 
@@ -376,5 +395,6 @@ void OSOpenBrowser(const char *url)
 	execvp(args[0], const_cast<char * const *>(args));
 	DEBUG(misc, 0, "Failed to open url: %s", url);
 	exit(0);
+#endif
 }
 #endif
