@@ -466,7 +466,6 @@ int VideoDriver_SDL::PollEvent()
 			HandleMouseEvents();
 			break;
 		case SDL_MOUSEWHEEL:
-			//SDL_MouseWheelEvent *mwev = &ev;
 			_cursor.wheel += ev.wheel.y;
 			break;
 		case SDL_MOUSEBUTTONDOWN:
@@ -503,14 +502,9 @@ int VideoDriver_SDL::PollEvent()
 			break;
 
 		case SDL_WINDOWEVENT:
-			//if (!(ev.active.state & SDL_APPMOUSEFOCUS)) break;
-
 			if (ev.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-			//if (ev.active.gain) { // mouse entered the window, enable cursor
+				// mouse entered the window, enable cursor
 				_cursor.in_window = true;
-			} else {
-				UndrawMouseCursor(); // mouse left the window, undraw cursor
-				_cursor.in_window = false;
 			}
 			break;
 		case SDL_JOYBUTTONDOWN:
@@ -529,6 +523,16 @@ int VideoDriver_SDL::PollEvent()
 			{
 				_left_button_down = true;
 				HandleMouseEvents();
+			}
+			else if (ev.jbutton.button == VITA_JOY_LTRIGGER)
+			{
+				// Zoom out
+				_cursor.wheel += 1;
+			}
+			else if (ev.jbutton.button == VITA_JOY_RTRIGGER)
+			{
+				// Zoom in
+				_cursor.wheel -= 1;
 			}
 			// Map d-pad to arrow keys in order to pan screen
 			else

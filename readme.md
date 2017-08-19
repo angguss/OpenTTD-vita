@@ -25,7 +25,10 @@ OpenTTD will attempt to load everything from ux0:/data/openttd/
 The easiest way to populate this is to install the PC version and copy the files across. In the future when network support is re-enabled the content downloader should be functional and this step will be skippable.
 
 ### Controls
-The touch screen is currently the only input. The plan is to implement d-pad or rear touch panel for panning and shoulder buttons for zoom level.
+ - The touch screen is currently mouse input, press and hold for dragging.
+ - Use the D-Pad for panning.
+ - Circle for right-click (hold while tapping)
+ - Triggers for zoom (right trigger zoom-in, left trigger zoom-out
 
 ### Current Limitations
  - The game is set to run at 480x272 scaled to the screen size for the sake of speed. It will run at 960x544 but don't expect more than ~10-15 FPS
@@ -36,4 +39,3 @@ The touch screen is currently the only input. The plan is to implement d-pad or 
 An initial openttd.cfg can be found in [bin/openttd.cfg](https://github.com/angguss/OpenTTD-vita/blob/master/bin/openttd.cfg), the important parts performance-wise are
  - `resolution = 480,272`
  - `sprite_cache_size_px = 8`
- 
