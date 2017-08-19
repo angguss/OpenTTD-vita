@@ -630,7 +630,6 @@ void VideoDriver_SDL::MainLoop()
 	uint32 mod;
 	int numkeys;
 
-
 	CheckPaletteAnim();
 
 	if (_draw_threaded) {
@@ -699,8 +698,6 @@ void VideoDriver_SDL::MainLoop()
 
 			_ctrl_pressed  = !!(mod & KMOD_CTRL);
 			_shift_pressed = !!(mod & KMOD_SHIFT);
-
-			debugNetPrintf(1, "_dirkeys = %d\n", _dirkeys);
 
 			/* determine which directional keys are down */
 // 			_dirkeys =
