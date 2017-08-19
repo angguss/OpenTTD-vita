@@ -814,7 +814,6 @@ int openttd_main(int argc, char *argv[])
 	/* Initialize game palette */
 	GfxInitPalettes();
 
-	DEBUG(misc, 1, "Loading blitter...");
 #ifdef PSVITA
 	// Force the 8bpp blitter, anything else is too slow
 	blitter = "8bpp-optimized";
@@ -836,7 +835,10 @@ int openttd_main(int argc, char *argv[])
 				usererror("Failed to select requested blitter '%s'; does it exist?", blitter);
 		}
 	}
+#if !defined(PSVITA)
+	// turns out freeing stack crashes, don't do this on vita
 	free(blitter);
+#endif
 
 	if (videodriver == NULL && _ini_videodriver != NULL) videodriver = stredup(_ini_videodriver);
 	DriverFactoryBase::SelectDriver(videodriver, Driver::DT_VIDEO);
@@ -912,7 +914,6 @@ int openttd_main(int argc, char *argv[])
 	/* Take our initial lock on whatever we might want to do! */
 	_modal_progress_paint_mutex->BeginCritical();
 	_modal_progress_work_mutex->BeginCritical();
-
 	GenerateWorld(GWM_EMPTY, 64, 64); // Make the viewport initialization happy
 	WaitTillGeneratedWorld();
 
