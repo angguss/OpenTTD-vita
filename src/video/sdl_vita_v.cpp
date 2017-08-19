@@ -30,16 +30,15 @@
 
 static FVideoDriver_SDL iFVideoDriver_SDL;
 
-//static uint32 *_screenbuf = NULL;
 static SDL_Texture *_sdl_screentext;
 // Operations:
 // We create a surface to draw to, handle palettes etc
 // We draw these to the texture
 // Once done, we sync the texture to the screen
 static SDL_Surface *_sdl_realsurface;
-//static SDL_Surface *_sdl_surface;
 static SDL_Window *_sdl_window;
 static SDL_Renderer *_sdl_renderer;
+
 // The renderer dest format for the conversion
 static SDL_PixelFormat *_dst_format;
 static SDL_Joystick *_sdl_joystick;
@@ -61,9 +60,41 @@ static int _num_dirty_rects;
 static int _use_hwpalette;
 static int _requested_hwpalette; /* Did we request a HWPALETTE for the current video mode? */
 
+#define VITA_JOY_TRIANGLE 0
+#define VITA_JOY_CIRCLE   1
+#define VITA_JOY_CROSS    2
+#define VITA_JOY_SQUARE	  3
+
+#define VITA_JOY_LTRIGGER 4
+#define VITA_JOY_RTRIGGER 5
+
+// down = 6, left = 7, up = 8, right = 9
+#define VITA_JOY_DOWN     6
+#define VITA_JOY_LEFT     7
+#define VITA_JOY_UP       8
+#define VITA_JOY_RIGHT    9
+
+#define VITA_JOY_SELECT	 10
+#define VITA_JOY_START   11
+
+#define VITA_TOUCH_FRONT  0
+#define VITA_TOUCH_BACK	  1
+
+#define OTTD_DIR_LEFT     1
+#define OTTD_DIR_UP       2
+#define OTTD_DIR_RIGHT    4
+#define OTTD_DIR_DOWN     8
+
+// Scale whatever we have to the vita screen resolution on GPU
+SDL_Rect _sdldest {0, 0, 960, 544};
+
 // PS Vita max touch coordinates
+// Should these be in the touch headers instead?
 #define MAX_TOUCH_X (960 * 2)
+#define HALF_TOUCH_X 960
 #define MAX_TOUCH_Y (544 * 2)
+#define HALF_TOUCH_Y 544
+// These get calculated at driver init
 static float _touch_scale_x = 0.f;
 static float _touch_scale_y = 0.f;
 
@@ -90,55 +121,6 @@ static void UpdatePalette(bool init = false)
 	}
 
 	SDL_SetPaletteColors(_sdl_realsurface->format->palette, pal, _local_palette.first_dirty, _local_palette.count_dirty);
-
-	//SDL_BlitSurface(_sdl_realsurface, NULL, _sdl_surface, NULL);
-	//SDL_UpdateWindowSurface(_sdl_window);
-
-	//SDL_BlitSurface(_sdl_surface, NULL, _sdl_realsurface, NULL);
-
-
-	//SDL_SetColors(_sdl_screen, pal, _local_palette.first_dirty, _local_palette.count_dirty);
-	//SDL_SetPaletteColors(_sdl_screen->format->palette, pal, _local_palette.first_dirty, _local_palette.count_dirty);
-	//if (_sdl_screen != _sdl_realscreen && init) {
-		/* When using a shadow surface, also set our palette on the real screen. This lets SDL
-		 * allocate as much colors (or approximations) as
-		 * possible, instead of using only the default SDL
-		 * palette. This allows us to get more colors exactly
-		 * right and might allow using better approximations for
-		 * other colors.
-		 *
-		 * Note that colors allocations are tried in-order, so
-		 * this favors colors further up into the palette. Also
-		 * note that if two colors from the same animation
-		 * sequence are approximated using the same color, that
-		 * animation will stop working.
-		 *
-		 * Since changing the system palette causes the colours
-		 * to change right away, and allocations might
-		 * drastically change, we can't use this for animation,
-		 * since that could cause weird coloring between the
-		 * palette change and the blitting below, so we only set
-		 * the real palette during initialisation.
-		 */
-	//	SDL_CALL SDL_SetColors(_sdl_realscreen, pal, _local_palette.first_dirty, _local_palette.count_dirty);
-	//}
-
-	//if (_sdl_screen != _sdl_realscreen && !init) {
-		/* We're not using real hardware palette, but are letting SDL
-		 * approximate the palette during shadow -> screen copy. To
-		 * change the palette, we need to recopy the entire screen.
-		 *
-		 * Note that this operation can slow down the rendering
-		 * considerably, especially since changing the shadow
-		 * palette will need the next blit to re-detect the
-		 * best mapping of shadow palette colors to real palette
-		 * colors from scratch.
-		 */
-	//	SDL_CALL SDL_BlitSurface(_sdl_screen, NULL, _sdl_realscreen, NULL);
-	//	SDL_CALL SDL_UpdateRect(_sdl_realscreen, 0, 0, 0, 0);
-	//}
-
-	//SDL_BlitSurface(_sdl_screen, NULL, SDL_GetWindowSurface(_sdl_window), NULL);
 }
 
 static void DrawSurfaceToScreen();
@@ -176,54 +158,20 @@ static void CheckPaletteAnim()
 	}
 }
 
-// Scale whatever we have to the vita screen resolution
-SDL_Rect _sdldest {0, 0, 960, 544};
-
 static void DrawSurfaceToScreen()
 {
 	int n = _num_dirty_rects;
 	if (n == 0) return;
 
 	_num_dirty_rects = 0;
-	// SDL_BlitSurface(_sdl_realsurface, NULL, _sdl_surface, NULL);
-	// SDL_UpdateWindowSurface(_sdl_window);
 
-	// //SDL_UpdateTexture(_sdl_screentext, NULL, _screenbuf, _screen.pitch);
 	SDL_Surface *temp = SDL_ConvertSurface(_sdl_realsurface, _dst_format, 0);
-//	SDL_UpdateTexture(_sdl_screentext, NULL, _sdl_realsurface->pixels, _screen.pitch);
 	SDL_UpdateTexture(_sdl_screentext, NULL, temp->pixels, temp->pitch);
 	// We need to scale whatever resolution we've got to the vita resolution
 	SDL_RenderCopy(_sdl_renderer, _sdl_screentext, NULL, &_sdldest);
 	SDL_RenderPresent(_sdl_renderer);
 
 	SDL_FreeSurface(temp);
-
-	//SDL_Texture *temptex = SDL_CreateTextureFromSurface(_sdl_renderer, _sdl_surface);
-	//SDL_RenderCopy(_sdl_renderer, _sdl_screentext, NULL, NULL);
-	//SDL_RenderCopy(_sdl_renderer, temptex, NULL, &_sdldest);
-	//SDL_RenderPresent(_sdl_renderer);
-
-	//SDL_SetPaletteColors
-
-	//SDL_DestroyTexture(temptex);
-
-	//SDL_DestroyTexture(temptex);
-
-	//if (n > MAX_DIRTY_RECTS) {
-		//if (_sdl_screen != _sdl_realscreen) {
-	//SDL_BlitSurface(_sdl_screen, NULL, SDL_GetWindowSurface(_sdl_window), NULL);
-
-		//}
-	//SDL_UpdateRect(_sdl_window, 0, 0, 0, 0);
-	//SDL_RenderPresent(_sdl_renderer);
-	//} else {
-	//	if (_sdl_screen != _sdl_realscreen) {
-	//		for (int i = 0; i < n; i++) {
-	//			SDL_BlitSurface(_sdl_screen, &_dirty_rects[i], _sdl_realscreen, &_dirty_rects[i]);
-	//		}
-	//	}
-	//	SDL_UpdateRects(_sdl_realscreen, n, _dirty_rects);
-	//}
 }
 
 static void DrawSurfaceToScreenThread(void *)
@@ -247,7 +195,7 @@ static void DrawSurfaceToScreenThread(void *)
 	_draw_thread->Exit();
 }
 
-// Vita only has two resolutions that really work. Can look at scaling this later maybe
+// Vita only has two resolutions that really work. Can look at scaling others later maybe
 static const Dimension _default_resolutions[] = {
 	{ 480,  272},
 	{ 960,	544}
@@ -255,22 +203,8 @@ static const Dimension _default_resolutions[] = {
 
 static void GetVideoModes()
 {
-	// int sdl_display_ct = SDL_GetNumVideoDisplays();
-	// debugNetPrintf(DBGN_INFO, "SDL2: Got %d displays\n", sdl_display_ct);
-
-	// int sdl_mode_ct = SDL_GetNumDisplayModes(0);
-	// debugNetPrintf(DBGN_INFO, "SDL2: Got %d modes\n", sdl_mode_ct);
-
-	// // Error here, what do we dooo??
-	// if (sdl_mode_ct < 0)
-	// 	usererror("sdl2: no displays available");
-
-	// if (sdl_mode_ct == 0)
-	// 	usererror("sdl2: no modes available");
-
-	int n = 0;
 	memcpy(_resolutions, _default_resolutions, sizeof(_default_resolutions));
-	_num_resolutions = 1;
+	_num_resolutions = 2;
 }
 
 static void GetAvailableVideoMode(uint *w, uint *h)
@@ -306,50 +240,22 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 	char caption[32];
 	seprintf(caption, lastof(caption), "OpenTTD %s", _openttd_revision);
 
-	//SDL_CreateWindowAndRenderer(w, h, SDL_WINDOW_FULLSCREEN_DESKTOP, &_sdl_window, &_sdl_renderer);
 	_sdl_window = SDL_CreateWindow(caption, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN);
-	_sdl_renderer = SDL_CreateRenderer(_sdl_window, -1, 0);	
+	_sdl_renderer = SDL_CreateRenderer(_sdl_window, -1, 0);
 	_sdl_screentext = SDL_CreateTexture(_sdl_renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, w, h);
-	//_sdl_surface =  SDL_GetWindowSurface(_sdl_window);
 	_sdl_realsurface = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
 
 	_touch_scale_x = MAX_TOUCH_X / w;
 	_touch_scale_y = MAX_TOUCH_Y / h;
 
-	debugNetPrintf(1, "w = %d, MAX_TOUCH_X = %d, _touch_scale_x = %f\n", w, MAX_TOUCH_X, _touch_scale_x);
-	debugNetPrintf(1, "h = %d, MAX_TOUCH_Y = %d, _touch_scale_y = %f\n", h, MAX_TOUCH_Y, _touch_scale_y);
-
-	debugNetPrintf(1, "CreateMainSurface [%d,%d]\n", w, h);
-	debugNetPrintf(1, "GetScreenDepth() [%d]\n", BlitterFactory::GetCurrentBlitter()->GetScreenDepth());
-
-	/*SDL_Surface *newscreen = SDL_CreateRGBSurface(0, w, h, 32,
-												0x00FF0000,
-												0x0000FF00,
-												0x000000FF,
-												0xFF000000);*/
-
-	//if (_screenbuf != NULL)
-	//{
-	//	delete[] _screenbuf;
-	//}
-	//_screenbuf = new uint32[w * h];
-
 	// Assign _screen values so the rest of openttd can draw to this surface
-	_screen.width = w;//newscreen->w;
-	_screen.height = h;//newscreen->h;
-	// assume bpp is 32
-	_screen.pitch = _cur_resolution.width;//newscreen->pitch / (32 / 8);
-	// 960 results in 4
-	// 960 / 2 results in 8
-	// so 960 * 2 == the right?
-	//_screen.pitch = _sdl_surface->pitch / (32 / 8);
+	_screen.width = w;
+	_screen.height = h;
+	_screen.pitch = _cur_resolution.width;
 	_screen.dst_ptr = _sdl_realsurface->pixels;
-	//_sdl_screen = newscreen;
 
-	//Uint32 format = _sdl_renderer->info.texture_formats[0];
 	Uint32 format = SDL_PIXELFORMAT_RGB888;
 	_dst_format = SDL_AllocFormat(format);
-	
 
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
 	if (SDL_NumJoysticks() > 0) {
@@ -368,7 +274,7 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 	/* When in full screen, we will always have the mouse cursor
 	 * within the window, even though SDL does not give us the
 	 * appropriate event to know this. */
-	if (_fullscreen) 
+	if (_fullscreen)
 		_cursor.in_window = true;
 
 	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
@@ -497,41 +403,47 @@ int VideoDriver_SDL::PollEvent()
 {
 	SDL_Event ev;
 
-	if (!SDL_CALL SDL_PollEvent(&ev)) 
-	{
-		//debugNetPrintf(1, "SDL_PollEvent -2\n");
-		return -2;
-	}
+	if (!SDL_CALL SDL_PollEvent(&ev)) return -2;
 
-	debugNetPrintf(1, "SDL_PollEvent: %d\n", ev.type);
 	bool cursor_updated = false;
 	switch (ev.type) {
 		case SDL_FINGERDOWN:
-			// possible to touch by just hovering without this
+			// #1 possible to touch by just hovering without this
+			// #2 this doesn't work, not accurate enough.
+			// works fine without checking pressure if the resolution
+			// is 480x272 but it's pretty awful if 960x544
 			//if (ev.tfinger.pressure > 40)
-			if (_cursor.UpdateCursorPosition(ev.tfinger.x / _touch_scale_x, ev.tfinger.y / _touch_scale_y, true))
+			if (ev.tfinger.touchId == VITA_TOUCH_FRONT)
 			{
-				SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
+				if (_cursor.UpdateCursorPosition(ev.tfinger.x / _touch_scale_x, ev.tfinger.y / _touch_scale_y, true))
+				{
+					SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
+				}
+				_left_button_down = true;
+				HandleMouseEvents();
 			}
-			_left_button_down = true;
-			//_left_button_clicked = true;
-			HandleMouseEvents();
 			break;
 		case SDL_FINGERUP:
-			if (_cursor.UpdateCursorPosition(ev.tfinger.x / _touch_scale_x, ev.tfinger.y / _touch_scale_y, true))
+			if (ev.tfinger.touchId == VITA_TOUCH_FRONT)
 			{
-				SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
+				if (_cursor.UpdateCursorPosition(ev.tfinger.x / _touch_scale_x, ev.tfinger.y / _touch_scale_y, true))
+				{
+					SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
+				}
+				_left_button_down = false;
+				_left_button_clicked = false;
+				HandleMouseEvents();
 			}
-			_left_button_down = false;
-			_left_button_clicked = false;
-			HandleMouseEvents();
 			break;
 		case SDL_FINGERMOTION:
-			if (_cursor.UpdateCursorPosition(ev.tfinger.x / _touch_scale_x, ev.tfinger.y / _touch_scale_y, true))
+			if (ev.tfinger.touchId == VITA_TOUCH_FRONT)
 			{
-				SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
+				if (_cursor.UpdateCursorPosition(ev.tfinger.x / _touch_scale_x, ev.tfinger.y / _touch_scale_y, true))
+				{
+					SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
+				}
+				HandleMouseEvents();
 			}
-			HandleMouseEvents();
 			break;
 		case SDL_JOYAXISMOTION:
 			// X axis
@@ -540,14 +452,12 @@ int VideoDriver_SDL::PollEvent()
 			// Y axis
 			else if (ev.jaxis.axis == 1 || ev.jaxis.axis == 3)
 				cursor_updated = _cursor.UpdateCursorPosition(_cursor.pos.x, _cursor.pos.y + ev.jaxis.value / 100, true);
-			
+
 			if (cursor_updated)
 			{
 				SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
 			}
-			//debugNetPrintf(1, "Axis: %d, Value: %ld\n", ev.jaxis.axis, ev.jaxis.value);
-			HandleMouseEvents();	
-			
+			HandleMouseEvents();
 			break;
 		case SDL_MOUSEMOTION:
 			if (_cursor.UpdateCursorPosition(ev.motion.x, ev.motion.y, true)) {
@@ -603,55 +513,53 @@ int VideoDriver_SDL::PollEvent()
 				_cursor.in_window = false;
 			}
 			break;
-
-		// case SDL_QUIT:
-		// 	HandleExitGameRequest();
-		// 	break;
 		case SDL_JOYBUTTONDOWN:
-			if (ev.jbutton.button == 1)
+			debugNetPrintf(1, "ev.jbutton: %d\n", ev.jbutton.button);
+			// Circle for right click
+			// This doesn't seem to work
+			if (ev.jbutton.button == VITA_JOY_CIRCLE)
 			{
 				_right_button_down = true;
 				_right_button_clicked = true;
 				HandleMouseEvents();
 			}
-			else if (ev.jbutton.button == 2)
+			// X for left click
+			// Also doesn't seem to work yet
+			else if (ev.jbutton.button == VITA_JOY_CROSS)
 			{
 				_left_button_down = true;
 				HandleMouseEvents();
 			}
-			else if (ev.jbutton.button == 6)
+			// Map d-pad to arrow keys in order to pan screen
+			else
 			{
-				WChar val = 1073741906;
-				HandleKeypress(SDLK_UP, val);
+				_dirkeys |= (ev.jbutton.button == VITA_JOY_DOWN ? OTTD_DIR_DOWN : 0) |
+							(ev.jbutton.button == VITA_JOY_LEFT ? OTTD_DIR_LEFT : 0) |
+							(ev.jbutton.button == VITA_JOY_UP ? OTTD_DIR_UP : 0) |
+							(ev.jbutton.button == VITA_JOY_RIGHT ? OTTD_DIR_RIGHT : 0);
 			}
-			else if (ev.jbutton.button == 7)
-			{
-				HandleKeypress(WKC_LEFT, NULL);
-			}
-			else if (ev.jbutton.button == 8)
-			{
-				HandleKeypress(WKC_UP, NULL);
-			}
-			else if (ev.jbutton.button == 9)
-			{
-				HandleKeypress(WKC_RIGHT, NULL);
-			}
-			debugNetPrintf(1, "button: %d\n", ev.jbutton.button);
-			// down = 6, left = 7, up = 8, right = 9
-			
 			break;
 		case SDL_JOYBUTTONUP:
-			if(ev.jbutton.button == 1)
+			if(ev.jbutton.button == VITA_JOY_CIRCLE)
 			{
 				_right_button_down = false;
 				_right_button_clicked = false;
+				HandleMouseEvents();
 			}
-			else if (ev.jbutton.button == 2)
+			else if (ev.jbutton.button == VITA_JOY_CROSS)
 			{
 				_left_button_down = false;
 				_left_button_clicked = false;
+				HandleMouseEvents();
 			}
-			HandleMouseEvents();
+			else
+			{
+				uint8 tmp = (ev.jbutton.button == VITA_JOY_DOWN ? OTTD_DIR_DOWN : 0) |
+							(ev.jbutton.button == VITA_JOY_LEFT ? OTTD_DIR_LEFT : 0) |
+							(ev.jbutton.button == VITA_JOY_UP ? OTTD_DIR_UP : 0) |
+							(ev.jbutton.button == VITA_JOY_RIGHT ? OTTD_DIR_RIGHT : 0);
+				_dirkeys = _dirkeys &~tmp;
+			}
 			break;
 		case SDL_KEYDOWN: // Toggle full-screen on ALT + ENTER/F
 			if ((ev.key.keysym.mod & KMOD_ALT) &&
@@ -664,47 +572,27 @@ int VideoDriver_SDL::PollEvent()
 			}
 
 			debugNetPrintf(1, "ev.key.keysym.sym: %d\n", ev.key.keysym.sym);
-
 			break;
-		// Can't resize on the vita
-		// case SDL_VIDEORESIZE: {
-		// 	int w = max(ev.resize.w, 64);
-		// 	int h = max(ev.resize.h, 64);
-		// 	CreateMainSurface(w, h);
-		// 	break;
-		// }
-		// case SDL_VIDEOEXPOSE: 
-			 // Force a redraw of the entire screen. Note
-			 // * that SDL 1.2 seems to do this automatically
-			 // * in most cases, but 1.3 / 2.0 does not. 
-		//         _num_dirty_rects = MAX_DIRTY_RECTS + 1;
-		// 	break;
-		
 	}
 	return -1;
 }
 
 const char *VideoDriver_SDL::Start(const char * const *parm)
 {
-	// Temporary
-	//_cur_resolution.width = 960;
-	//_cur_resolution.height = 544;
-
-	debugNetPrintf(DBGN_INFO, "VideoDriver_SDL::Start enter\n");
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 		return "SDL_INIT_VIDEO failed";
 
 	GetVideoModes();
 
 	if (!CreateMainSurface(_cur_resolution.width, _cur_resolution.height)) {
-		debugNetPrintf(DBGN_INFO, "CreateMainSurface: %d, %d\n", _cur_resolution.width, _cur_resolution.height);
-		return "Failed to make surface";
+		DEBUG(driver, 1, "CreateMainSurface: %d, %d\n", _cur_resolution.width, _cur_resolution.height);
+		return "CreateMainSurface failed";
 	}
 
 	int renderCt = SDL_GetNumRenderDrivers();
 
 	if (renderCt < 0) {
-		return "renderCt is < 0";
+		return "SDL_GetNumRenderDrivers: No drivers found";
 	}
 
 	SDL_RendererInfo info;
@@ -718,7 +606,6 @@ const char *VideoDriver_SDL::Start(const char * const *parm)
 
 	_draw_threaded = GetDriverParam(parm, "no_threads") == NULL && GetDriverParam(parm, "no_thread") == NULL;
 
-	debugNetPrintf(DBGN_INFO, "VideoDriver_SDL::Start exit\n");
 	return NULL;
 }
 
@@ -742,7 +629,7 @@ void VideoDriver_SDL::MainLoop()
 	uint32 next_tick = cur_ticks + MILLISECONDS_PER_TICK;
 	uint32 mod;
 	int numkeys;
-	
+
 
 	CheckPaletteAnim();
 
@@ -813,19 +700,21 @@ void VideoDriver_SDL::MainLoop()
 			_ctrl_pressed  = !!(mod & KMOD_CTRL);
 			_shift_pressed = !!(mod & KMOD_SHIFT);
 
+			debugNetPrintf(1, "_dirkeys = %d\n", _dirkeys);
+
 			/* determine which directional keys are down */
-			_dirkeys =
-#if SDL_VERSION_ATLEAST(1, 3, 0)
-				(keys[SDL_SCANCODE_LEFT]  ? 1 : 0) |
-				(keys[SDL_SCANCODE_UP]    ? 2 : 0) |
-				(keys[SDL_SCANCODE_RIGHT] ? 4 : 0) |
-				(keys[SDL_SCANCODE_DOWN]  ? 8 : 0);
-#else
-				(keys[SDLK_LEFT]  ? 1 : 0) |
-				(keys[SDLK_UP]    ? 2 : 0) |
-				(keys[SDLK_RIGHT] ? 4 : 0) |
-				(keys[SDLK_DOWN]  ? 8 : 0);
-#endif
+// 			_dirkeys =
+// #if SDL_VERSION_ATLEAST(1, 3, 0)
+// 				(keys[SDL_SCANCODE_LEFT]  ? 1 : 0) |
+// 				(keys[SDL_SCANCODE_UP]    ? 2 : 0) |
+// 				(keys[SDL_SCANCODE_RIGHT] ? 4 : 0) |
+// 				(keys[SDL_SCANCODE_DOWN]  ? 8 : 0);
+// #else
+// 				(keys[SDLK_LEFT]  ? 1 : 0) |
+// 				(keys[SDLK_UP]    ? 2 : 0) |
+// 				(keys[SDLK_RIGHT] ? 4 : 0) |
+// 				(keys[SDLK_DOWN]  ? 8 : 0);
+// #endif
 			if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
 
 			/* The gameloop is the part that can run asynchronously. The rest
