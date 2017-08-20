@@ -1476,6 +1476,9 @@ static void DoAutosave()
 	/* Autosaving in networking is too time expensive for the PSP */
 	if (_networking) return;
 #endif /* PSP */
+#if defined(PSVITA)
+	return;
+#endif
 
 	if (_settings_client.gui.keep_all_autosave) {
 		GenerateDefaultSaveName(buf, lastof(buf));
