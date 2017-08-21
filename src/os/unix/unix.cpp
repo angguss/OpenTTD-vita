@@ -21,6 +21,8 @@
 #if defined(PSVITA)
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/io/dirent.h>
+#include <psp2/kernel/threadmgr.h>
+#include <thread>
 #include <debugnet.h>
 #include "../../fileio_func.h"
 #else
@@ -276,7 +278,7 @@ int CDECL main(int argc, char *argv[])
 #else
 	/* Make sure our arguments contain only valid UTF-8 characters. */
 	for (int i = 0; i < argc; i++) ValidateString(argv[i]);
-#endif	
+#endif
 
 #ifdef WITH_COCOA
 	cocoaSetupAutoreleasePool();
@@ -397,4 +399,21 @@ void OSOpenBrowser(const char *url)
 	exit(0);
 #endif
 }
+
+#if defined(PSVITA)
+
+extern "C"
+{
+	void __sinit(struct _reent *);
+}
+
+__attribute__((constructor(101)))
+void pthread_setup(void)
+{
+	pthread_init();
+	__sinit(_REENT);
+}
+
+#endif
+
 #endif

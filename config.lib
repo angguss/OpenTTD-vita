@@ -1567,7 +1567,7 @@ make_cflags_and_ldflags() {
 		fi
 	fi
 
-	if [ "$os" != "CYGWIN" ] && [ "$os" != "HAIKU" ] && [ "$os" != "OPENBSD" ] && [ "$os" != "MINGW" ] && [ "$os" != "MORPHOS" ] && [ "$os" != "OSX" ] && [ "$os" != "DOS" ] && [ "$os" != "WINCE" ] && [ "$os" != "PSP" ] && [ "$os" != "OS2" ]; then
+	if [ "$os" != "CYGWIN" ] && [ "$os" != "HAIKU" ] && [ "$os" != "OPENBSD" ] && [ "$os" != "MINGW" ] && [ "$os" != "MORPHOS" ] && [ "$os" != "OSX" ] && [ "$os" != "DOS" ] && [ "$os" != "WINCE" ] && [ "$os" != "PSP" ] && [ "$os" != "PSVITA" ] && [ "$os" != "OS2" ]; then
 		LIBS="$LIBS -lpthread"
 	fi
 
@@ -1589,7 +1589,7 @@ make_cflags_and_ldflags() {
 		CFLAGS="-Wl,-q $CFLAGS -mfpu=neon -mcpu=cortex-a9 -march=armv7-a -mfloat-abi=hard -Wl,-q"
 		CXXFLAGS="$CXXFLAGS -Wl,-q"
 		# TODO: This needs to be autoconfigured properly (mostly SDL)
-		LIBS="$LIBS -lSDL2 -lvita2d -lSceGxm_stub -lSceSysmodule_stub -lSceCtrl_stub -lSceDisplay_stub -lSceCommonDialog_stub -lSceAudio_stub -ldebugnet -lSceNetCtl_stub -lSceTouch_stub"
+		LIBS="$LIBS -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -lSDL2 -lvita2d -lSceGxm_stub -lSceSysmodule_stub -lSceCtrl_stub -lSceDisplay_stub -lSceCommonDialog_stub -lSceAudio_stub -ldebugnet -lSceNetCtl_stub -lSceTouch_stub"
 		LDFLAGS="$LDFLAGS -Wl,-z,nocopyreloc -Wl,-q"
 	fi
 
@@ -2632,6 +2632,14 @@ detect_library() {
 			fi
 		fi
 
+		if [ -z "$res" ] && [ "$os" = "PSVITA" ]; then
+			eval "$2=`ls -1 $VITASDK/arm-vita-eabi/include/$4*.h 2>/dev/null | egrep \"\/$5\$\"`"
+			eval "res=\$$2"
+			if [ -z "$res" ]; then
+				log 2 "  trying $VITASDK/arm-vita-eabi/include/$4$5... no"
+			fi
+		fi
+
 		eval "res=\$$2"
 		if [ -n "$res" ] && ( [ -n "$force_static" ] || ( [ "$enable_static" != "0" ] && [ "$os" != "OSX" ] ) ); then
 			eval "res=\$$2"
@@ -2652,6 +2660,10 @@ detect_library() {
 			if [ -z "$res" ]; then
 				log 2 "  trying /usr/local/lib/$3... no"
 				eval "$2=`ls /mingw/lib/*.a 2>/dev/null | egrep \"\/$3\$\"`"
+			fi
+			if [ -z "$res" ] && [ "$os" = "PSVITA" ]; then
+				log 2 "  trying $VITASDK/arm-vita-eabi/lib/$3... no"
+				eval "$2=`ls $VITASDK/arm-vita-eabi/lib/*.a 2>/dev/null | egrep \"\/$3\$\"`"
 			fi
 			eval "res=\$$2"
 			if [ -z "$res" ]; then
