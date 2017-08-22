@@ -8,7 +8,7 @@
 Configure with
 
 ```
-PKG_CONFIG_PATH=$VITASDK/arm-vita-eabi/lib/pkgconfig ./configure --os=PSVITA --host arm-vita-eabi --enable-static --prefix=/usr/local/vitasdk --with-sdl="pkg-config sdl2" --without-liblzo2 --without-fontconfig --disable-strip --enable-network=0 --without-threads
+PKG_CONFIG_PATH=$VITASDK/arm-vita-eabi/lib/pkgconfig ./configure --os=PSVITA --host arm-vita-eabi --enable-static --prefix=/usr/local/vitasdk --with-sdl="pkg-config sdl2" --without-fontconfig --disable-strip --enable-network=0
 ```
 
 Then build
