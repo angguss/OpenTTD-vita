@@ -21,7 +21,7 @@
 #if defined(PSVITA)
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/io/dirent.h>
-#include <psp2/kernel/threadmgr.h>
+#include <psp2/appmgr.h>
 #include <thread>
 #include <debugnet.h>
 #include "../../fileio_func.h"
@@ -106,6 +106,9 @@ bool FiosGetDiskFreeSpace(const char *path, uint64 *tot)
 
 	if (statvfs(path, &s) != 0) return false;
 	free = (uint64)s.f_frsize * s.f_bavail;
+#elif defined(PSVITA)
+	uint64_t max_size = 0;
+	sceAppMgrGetDevInfo("ux0:", &max_size, &free);
 #endif
 	if (tot != NULL) *tot = free;
 	return true;
