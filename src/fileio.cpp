@@ -51,6 +51,10 @@ struct Fio {
 	byte buffer_start[FIO_BUFFER_SIZE];    ///< local buffer when read from file
 	const char *filenames[MAX_FILE_SLOTS]; ///< array of filenames we (should) have open
 	char *shortnames[MAX_FILE_SLOTS];      ///< array of short names for spriteloader's use
+#if defined(PSVITA)
+	Subdirectory cur_subdirectory;		   ///< current subdirectory
+	Subdirectory subdirectories[MAX_FILE_SLOTS]; ///< subdirectories
+#endif
 #if defined(LIMITED_FDS)
 	uint open_handles;                     ///< current amount of open handles
 	uint usage_count[MAX_FILE_SLOTS];      ///< count how many times this file has been opened
@@ -99,6 +103,40 @@ int closedir(DIR d) {
 	return sceIoDclose(d);
 }
 
+// Fix the current open/invalidated file handle
+void FioFixFileHnds()
+{
+	char buf[MAX_PATH];
+
+	FioFindFullPath(buf, lastof(buf), _fio.cur_subdirectory, _fio.filename);
+
+	int slot = -1;
+
+	// Can't just fix up cur_fh, we also need to update the entry
+	// in _fio.handles before the new handle is obtained
+	for (unsigned int xx = 0; xx < MAX_FILE_SLOTS; xx++)
+	{
+		if (_fio.handles[xx] == _fio.cur_fh)
+		{
+			slot = xx;
+		}
+	}
+
+	// as far as I can tell all instances of slot files are opened
+	// with rb - if this is incorrect can add tracking of mode per file
+	// as well
+	_fio.cur_fh = fopen(buf, "rb");
+	if (_fio.cur_fh < 0)
+		DEBUG(misc, 0, "Failed to fix hnd\n");
+
+	if ((_fio.cur_fh, 9, SEEK_SET) < 0)
+		DEBUG(misc, 0, "Failed to seek in fixed hnd\n");
+
+	// Finally update the stored handle
+	if (slot != -1)
+		_fio.handles[slot] = _fio.cur_fh;
+}
+
 #endif
 
 /**
@@ -132,6 +170,14 @@ void FioSeekTo(size_t pos, int mode)
 	_fio.pos = pos;
 	if (fseek(_fio.cur_fh, _fio.pos, SEEK_SET) < 0) {
 		DEBUG(misc, 0, "Seeking in %s failed", _fio.filename);
+		// On the Vita, file handles seem to get invalidated if the device
+		// is suspended, attempt to re-open the file
+#if defined(PSVITA)
+		FioFixFileHnds();
+		if (fseek(_fio.cur_fh, _fio.pos, SEEK_SET) < 0) {
+			DEBUG(misc, 0, "Vita - Fix failed, expect a crash soon.");
+		}
+#endif
 	}
 }
 
@@ -141,7 +187,7 @@ static void FioRestoreFile(int slot)
 	/* Do we still have the file open, or should we reopen it? */
 	if (_fio.handles[slot] == NULL) {
 		DEBUG(misc, 6, "Restoring file '%s' in slot '%d' from disk", _fio.filenames[slot], slot);
-		FioOpenFile(slot, _fio.filenames[slot]);
+		FioOpenFile(slot, _fio.filenames[slot], _fio.subdirectories[slot]);
 	}
 	_fio.usage_count[slot]++;
 }
@@ -163,6 +209,7 @@ void FioSeekToFile(uint8 slot, size_t pos)
 	assert(f != NULL);
 	_fio.cur_fh = f;
 	_fio.filename = _fio.filenames[slot];
+	_fio.cur_subdirectory = _fio.subdirectories[slot];
 	FioSeekTo(pos, SEEK_SET);
 }
 
@@ -241,7 +288,10 @@ static inline void FioCloseFile(int slot)
 
 		free(_fio.shortnames[slot]);
 		_fio.shortnames[slot] = NULL;
-
+		_fio.filenames[slot] = NULL;
+#if defined(PSVITA)
+		_fio.subdirectories[slot] = NO_DIRECTORY;
+#endif
 		_fio.handles[slot] = NULL;
 #if defined(LIMITED_FDS)
 		_fio.open_handles--;
@@ -301,7 +351,16 @@ void FioOpenFile(int slot, const char *filename, Subdirectory subdir)
 
 	FioCloseFile(slot); // if file was opened before, close it
 	_fio.handles[slot] = f;
+#if defined(PSVITA)
+	// TBH I'm not sure this should be a vita-only fix, this memory
+	// seems to be free'd higher up. In the non-vita build it's not an issue
+	// because the handles should stay valid so who cares if the filename gets
+	// fucked? but we need it to re-open later on
+	_fio.filenames[slot] = stredup(filename);
+#else
 	_fio.filenames[slot] = filename;
+#endif
+	_fio.subdirectories[slot] = subdir;
 
 	/* Store the filename without path and extension */
 	const char *t = strrchr(filename, PATHSEPCHAR);
@@ -599,7 +658,7 @@ static void FioCreateDirectory(const char *name)
 
 	mkdir(OTTD2FS(buf), 0755);
 #elif defined(PSVITA)
-	sceIoMkdir(OTTD2FS(name), 0xFFF);
+	sceIoMkdir(OTTD2FS(name), 0x777);
 #else
 	mkdir(OTTD2FS(name), 0755);
 #endif
@@ -644,7 +703,7 @@ char *BuildWithFullPath(const char *dir)
 	/* Add absolute path */
 	if (s == NULL || dest != s) {
 #ifndef PSVITA
-		if (getcwd(dest, MAX_PATH) == NULL) 
+		if (getcwd(dest, MAX_PATH) == NULL)
 #endif
 			*dest = '\0';
 		AppendPathSeparator(dest, last);
@@ -1218,7 +1277,7 @@ void DetermineBasePaths(const char *exe)
 	if (ChangeWorkingDirectoryToExecutable(exe)) {
 	// Skip getcwd for vita, doesn't support
 #if !defined(PSVITA)
-		if (getcwd(tmp, MAX_PATH) == NULL) 
+		if (getcwd(tmp, MAX_PATH) == NULL)
 #endif
 			*tmp = '\0';
 		AppendPathSeparator(tmp, lastof(tmp));
@@ -1372,7 +1431,7 @@ void DeterminePaths(const char *exe)
 	extern char *_log_file;
 	_log_file = str_fmt("%sopenttd.log",  _personal_dir);
 #else /* ENABLE_NETWORK */
-	
+
 	/* If we don't have networking, we don't need to make the directory. But
 	 * if it exists we keep it, otherwise remove it from the search paths. */
 	if (!FileExists(_searchpaths[SP_AUTODOWNLOAD_DIR]))  {
