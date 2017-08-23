@@ -176,7 +176,6 @@ static void DrawSurfaceToScreen()
 
 static void DrawSurfaceToScreenThread(void *)
 {
-	debugNetPrintf(1, "DrawSurfaceToScreenThread.\n");
 	/* First tell the main thread we're started */
 	_draw_mutex->BeginCritical();
 	_draw_mutex->SendSignal();
@@ -198,13 +197,14 @@ static void DrawSurfaceToScreenThread(void *)
 // Vita only has two resolutions that really work. Can look at scaling others later maybe
 static const Dimension _default_resolutions[] = {
 	{ 480,  272},
+	{ 720, 	408},
 	{ 960,	544}
 };
 
 static void GetVideoModes()
 {
 	memcpy(_resolutions, _default_resolutions, sizeof(_default_resolutions));
-	_num_resolutions = 2;
+	_num_resolutions = 3;
 }
 
 static void GetAvailableVideoMode(uint *w, uint *h)
@@ -233,10 +233,11 @@ static void GetAvailableVideoMode(uint *w, uint *h)
 
 bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 {
-
+	// TODO: Implement destroying and recreating this so we can change resolution
+	// on the go
 	if (_sdl_window != NULL)
 		return true;
-	// On the vita, w and h are always 960x544
+
 	char caption[32];
 	seprintf(caption, lastof(caption), "OpenTTD %s", _openttd_revision);
 
@@ -258,17 +259,9 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 	_dst_format = SDL_AllocFormat(format);
 
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+	// Let this fail silently
 	if (SDL_NumJoysticks() > 0) {
 		_sdl_joystick = SDL_JoystickOpen(0);
-		if (_sdl_joystick) {
-	        debugNetPrintf(1, "Opened Joystick 0\n");
-	        debugNetPrintf(1, "Name: %s\n", SDL_JoystickNameForIndex(0));
-	        debugNetPrintf(1, "Number of Axes: %d\n", SDL_JoystickNumAxes(_sdl_joystick));
-	        debugNetPrintf(1, "Number of Buttons: %d\n", SDL_JoystickNumButtons(_sdl_joystick));
-	        debugNetPrintf(1, "Number of Balls: %d\n", SDL_JoystickNumBalls(_sdl_joystick));
-	    } else {
-	        debugNetPrintf(1, "Couldn't open Joystick 0\n");
-	    }
 	}
 
 	/* When in full screen, we will always have the mouse cursor
@@ -398,7 +391,6 @@ static uint ConvertSdlKeyIntoMy(SDL_Keysym *sym, WChar *character)
 	return key;
 }
 
-
 int VideoDriver_SDL::PollEvent()
 {
 	SDL_Event ev;
@@ -446,17 +438,18 @@ int VideoDriver_SDL::PollEvent()
 			}
 			break;
 		case SDL_JOYAXISMOTION:
+			// Disable this for now, doesn't work great
 			// X axis
-			if (ev.jaxis.axis == 0 || ev.jaxis.axis == 2)
-				cursor_updated = _cursor.UpdateCursorPosition(_cursor.pos.x + ev.jaxis.value / 100, _cursor.pos.y, true);
-			// Y axis
-			else if (ev.jaxis.axis == 1 || ev.jaxis.axis == 3)
-				cursor_updated = _cursor.UpdateCursorPosition(_cursor.pos.x, _cursor.pos.y + ev.jaxis.value / 100, true);
+			// if (ev.jaxis.axis == 0 || ev.jaxis.axis == 2)
+			// 	cursor_updated = _cursor.UpdateCursorPosition(_cursor.pos.x + ev.jaxis.value / 100, _cursor.pos.y, true);
+			// // Y axis
+			// else if (ev.jaxis.axis == 1 || ev.jaxis.axis == 3)
+			// 	cursor_updated = _cursor.UpdateCursorPosition(_cursor.pos.x, _cursor.pos.y + ev.jaxis.value / 100, true);
 
-			if (cursor_updated)
-			{
-				SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
-			}
+			// if (cursor_updated)
+			// {
+			// 	SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
+			// }
 			HandleMouseEvents();
 			break;
 		case SDL_MOUSEMOTION:
@@ -508,7 +501,6 @@ int VideoDriver_SDL::PollEvent()
 			}
 			break;
 		case SDL_JOYBUTTONDOWN:
-			debugNetPrintf(1, "ev.jbutton: %d\n", ev.jbutton.button);
 			// Circle for right click
 			// This doesn't seem to work
 			if (ev.jbutton.button == VITA_JOY_CIRCLE)
@@ -524,6 +516,8 @@ int VideoDriver_SDL::PollEvent()
 				_left_button_down = true;
 				HandleMouseEvents();
 			}
+			// Just pretend we're wheeling the mouse wheel
+			// than implementing this properly
 			else if (ev.jbutton.button == VITA_JOY_LTRIGGER)
 			{
 				// Zoom out
