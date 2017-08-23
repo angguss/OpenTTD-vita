@@ -331,7 +331,7 @@
 	#define OTTD_PRINTFHEX64 "%llx"
 // Vita libs don't support %zu so use lu instead
 #if defined(__vita__)
-	#define PRINTF_SIZE "%lu"
+	#define PRINTF_SIZE "%u"
 #else
 	#define PRINTF_SIZE "%zu"
 #endif
