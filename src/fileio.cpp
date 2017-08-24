@@ -658,7 +658,7 @@ static void FioCreateDirectory(const char *name)
 
 	mkdir(OTTD2FS(buf), 0755);
 #elif defined(PSVITA)
-	sceIoMkdir(OTTD2FS(name), 0x777);
+	sceIoMkdir(OTTD2FS(name), 0777);
 #else
 	mkdir(OTTD2FS(name), 0755);
 #endif
