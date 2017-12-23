@@ -12,8 +12,8 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-#if defined(__vita__)
-#include <debugnet.h>
+#if defined(PSVITA)
+#include <psp2/kernel/clib.h>
 #endif
 
 #include "cpu.h"

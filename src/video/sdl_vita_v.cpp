@@ -94,9 +94,14 @@ SDL_Rect _sdldest {0, 0, 960, 544};
 #define HALF_TOUCH_X 960
 #define MAX_TOUCH_Y (544 * 2)
 #define HALF_TOUCH_Y 544
+
+#define VITA_JOYSTICK_DEADZONE 16000
+
 // These get calculated at driver init
 static float _touch_scale_x = 0.f;
 static float _touch_scale_y = 0.f;
+
+static int _cursor_move_x = 0, _cursor_move_y = 0;
 
 void VideoDriver_SDL::MakeDirty(int left, int top, int width, int height)
 {
@@ -236,7 +241,11 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 	// TODO: Implement destroying and recreating this so we can change resolution
 	// on the go
 	if (_sdl_window != NULL)
-		return true;
+	{
+		//SDL_DestroyTexture(_sdl_screentext);
+		//SDL_DestroyRenderer(_sdl_renderer);
+		//SDL_DestroyWindow(_sdl_window);
+	}
 
 	char caption[32];
 	seprintf(caption, lastof(caption), "OpenTTD %s", _openttd_revision);
@@ -398,6 +407,9 @@ int VideoDriver_SDL::PollEvent()
 	if (!SDL_CALL SDL_PollEvent(&ev)) return -2;
 
 	bool cursor_updated = false;
+
+	//sceClibPrintf("ev.type: %d", ev.type);
+
 	switch (ev.type) {
 		case SDL_FINGERDOWN:
 			// #1 possible to touch by just hovering without this
@@ -438,19 +450,8 @@ int VideoDriver_SDL::PollEvent()
 			}
 			break;
 		case SDL_JOYAXISMOTION:
-			// Disable this for now, doesn't work great
-			// X axis
-			// if (ev.jaxis.axis == 0 || ev.jaxis.axis == 2)
-			// 	cursor_updated = _cursor.UpdateCursorPosition(_cursor.pos.x + ev.jaxis.value / 100, _cursor.pos.y, true);
-			// // Y axis
-			// else if (ev.jaxis.axis == 1 || ev.jaxis.axis == 3)
-			// 	cursor_updated = _cursor.UpdateCursorPosition(_cursor.pos.x, _cursor.pos.y + ev.jaxis.value / 100, true);
-
-			// if (cursor_updated)
-			// {
-			// 	SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
-			// }
-			HandleMouseEvents();
+			// Don't handle this event, instead we poll on the draw loop for the most up-to-date joystick
+			// state.
 			break;
 		case SDL_MOUSEMOTION:
 			if (_cursor.UpdateCursorPosition(ev.motion.x, ev.motion.y, true)) {
@@ -569,9 +570,10 @@ int VideoDriver_SDL::PollEvent()
 				HandleKeypress(keycode, character);
 			}
 
-			debugNetPrintf(1, "ev.key.keysym.sym: %d\n", ev.key.keysym.sym);
+			DEBUG(misc, 1, "ev.key.keysym.sym: %d\n", ev.key.keysym.sym);
 			break;
 	}
+
 	return -1;
 }
 
@@ -621,7 +623,7 @@ void VideoDriver_SDL::Stop()
 
 void VideoDriver_SDL::MainLoop()
 {
-	debugNetPrintf(1, "MainLoop.\n");
+	DEBUG(misc, 1, "MainLoop.\n");
 	uint32 cur_ticks = SDL_CALL SDL_GetTicks();
 	uint32 last_cur_ticks = cur_ticks;
 	uint32 next_tick = cur_ticks + MILLISECONDS_PER_TICK;
@@ -697,19 +699,27 @@ void VideoDriver_SDL::MainLoop()
 			_ctrl_pressed  = !!(mod & KMOD_CTRL);
 			_shift_pressed = !!(mod & KMOD_SHIFT);
 
-			/* determine which directional keys are down */
-// 			_dirkeys =
-// #if SDL_VERSION_ATLEAST(1, 3, 0)
-// 				(keys[SDL_SCANCODE_LEFT]  ? 1 : 0) |
-// 				(keys[SDL_SCANCODE_UP]    ? 2 : 0) |
-// 				(keys[SDL_SCANCODE_RIGHT] ? 4 : 0) |
-// 				(keys[SDL_SCANCODE_DOWN]  ? 8 : 0);
-// #else
-// 				(keys[SDLK_LEFT]  ? 1 : 0) |
-// 				(keys[SDLK_UP]    ? 2 : 0) |
-// 				(keys[SDLK_RIGHT] ? 4 : 0) |
-// 				(keys[SDLK_DOWN]  ? 8 : 0);
-// #endif
+			int joystick_x = SDL_JoystickGetAxis(_sdl_joystick, 0);
+			int joystick_y = SDL_JoystickGetAxis(_sdl_joystick, 1);
+
+			const int joystick_to_screen_divisor = 5000;
+
+			if (joystick_x > VITA_JOYSTICK_DEADZONE || joystick_x < -VITA_JOYSTICK_DEADZONE)
+				_cursor_move_x = joystick_x / joystick_to_screen_divisor;
+			else if (joystick_x < VITA_JOYSTICK_DEADZONE && joystick_x > -VITA_JOYSTICK_DEADZONE)
+				_cursor_move_x = 0;
+
+			if (joystick_y > VITA_JOYSTICK_DEADZONE || joystick_y < -VITA_JOYSTICK_DEADZONE)
+				_cursor_move_y = joystick_y / joystick_to_screen_divisor;
+
+			else if (joystick_y < VITA_JOYSTICK_DEADZONE && joystick_y > -VITA_JOYSTICK_DEADZONE)
+				_cursor_move_y = 0;
+
+			_cursor.UpdateCursorPosition(_cursor.pos.x + _cursor_move_x, _cursor.pos.y + _cursor_move_y, true);
+			SDL_CALL SDL_WarpMouseInWindow(_sdl_window, _cursor.pos.x, _cursor.pos.y);
+
+			HandleMouseEvents();
+
 			if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
 
 			/* The gameloop is the part that can run asynchronously. The rest

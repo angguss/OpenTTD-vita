@@ -23,7 +23,6 @@
 #include <psp2/io/dirent.h>
 #include <psp2/appmgr.h>
 #include <thread>
-#include <debugnet.h>
 #include "../../fileio_func.h"
 #else
 #include <dirent.h>
@@ -270,15 +269,16 @@ void cocoaSetupAutoreleasePool();
 void cocoaReleaseAutoreleasePool();
 #endif
 
-int CDECL main(int argc, char *argv[])
-{
 
 #if defined(PSVITA)
-	// TODO: Make this configurable from openttd cfg
-	int debugnet_ret = debugNetInit("192.168.144.52", 18194, DBGN_DEBUG);
-	debugNetPrintf(DBGN_DEBUG, "Loaded debugnet (%d)\n", debugnet_ret);
-	debugNetPrintf(DBGN_INFO, "Starting main...");
-#else
+// Set heap to 100mb (default is 32mb)
+int _newlib_heap_size_user = 100 * 1024 * 1024;
+#endif
+
+int CDECL main(int argc, char *argv[])
+{
+/* PS Vita has null pointer as argv */
+#if !defined(PSVITA)
 	/* Make sure our arguments contain only valid UTF-8 characters. */
 	for (int i = 0; i < argc; i++) ValidateString(argv[i]);
 #endif

@@ -70,13 +70,6 @@
 
 #include "safeguards.h"
 
-#ifdef PSVITA
-#include <debugnet.h>
-// redefine the DEBUG macro for the vita since there's no console output,
-// we can capture these messages in socat
-#define DEBUG(arga, argv, ...) debugNetPrintf(DBGN_INFO, __VA_ARGS__)
-#endif
-
 void CallLandscapeTick();
 void IncreaseDate();
 void DoPaletteAnimations();
@@ -107,7 +100,7 @@ void CDECL usererror(const char *s, ...)
 	vseprintf(buf, lastof(buf), s, va);
 	va_end(va);
 
-	debugNetPrintf(DBGN_INFO, "usererror: %s\n", buf);
+	sceClibPrintf("usererror: %s\n", buf);
 }
 
 void CDECL error(const char *s, ...)
@@ -119,7 +112,7 @@ void CDECL error(const char *s, ...)
 	vseprintf(buf, lastof(buf), s, va);
 	va_end(va);
 
-	debugNetPrintf(DBGN_INFO, "error: %s\n", buf);
+	sceClibPrintf("error: %s\n", buf);
 }
 
 void CDECL ShowInfoF(const char *s, ...)
@@ -131,7 +124,7 @@ void CDECL ShowInfoF(const char *s, ...)
 	vseprintf(buf, lastof(buf), s, va);
 	va_end(va);
 
-	debugNetPrintf(DBGN_INFO, "ShowInfoF: %s\n", buf);
+	sceClibPrintf("ShowInfoF: %s\n", buf);
 }
 
 #else
@@ -724,10 +717,6 @@ int openttd_main(int argc, char *argv[])
 		}
 		if (i == -2) break;
 	}
-
-#if defined(PSVITA)
-	debugNetPrintf(DBGN_INFO, "Finished scanning opts\n");
-#endif
 
 	if (i == -2 || mgo.numleft > 0) {
 		/* Either the user typed '-h', he made an error, or he added unrecognized command line arguments.

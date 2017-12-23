@@ -142,7 +142,7 @@ static void debug_print(const char *dbg, const char *buf)
 #elif defined(WIN32) || defined(WIN64)
 		_fputts(OTTD2FS(buffer, true), stderr);
 #elif defined(PSVITA)
-		debugNetPrintf(DBGN_INFO, "%s\n", buf);
+		sceClibPrintf("%s\n", buf);
 #else
 		fputs(buffer, stderr);
 #endif
@@ -168,11 +168,7 @@ void CDECL debug(const char *dbg, const char *format, ...)
 	vseprintf(buf, lastof(buf), format, va);
 	va_end(va);
 
-#if defined(PSVITA)
-	debugNetPrintf(DBGN_INFO, "%s\n", buf);
-#else
 	debug_print(dbg, buf);
-#endif
 }
 #endif /* NO_DEBUG_MESSAGES */
 
