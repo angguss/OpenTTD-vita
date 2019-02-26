@@ -13,7 +13,7 @@
 #define DEBUG_H
 
 #if defined(PSVITA)
-#include <psp2/kernel/clib.h>
+//#include <psp2/kernel/clib.h>
 #endif
 
 #include "cpu.h"

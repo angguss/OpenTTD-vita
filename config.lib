@@ -1589,7 +1589,7 @@ make_cflags_and_ldflags() {
 		CFLAGS="-Wl,-q $CFLAGS -mfpu=neon -mcpu=cortex-a9 -march=armv7-a -mfloat-abi=hard -Wl,-q"
 		CXXFLAGS="$CXXFLAGS -Wl,-q"
 		# TODO: This needs to be autoconfigured properly (mostly SDL)
-		LIBS="$LIBS -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -lSDL2 -lvita2d -lSceAppMgr_stub -lSceGxm_stub -lSceSysmodule_stub -lSceCtrl_stub -lSceDisplay_stub -lSceCommonDialog_stub -lSceAudio_stub -ldebugnet -lSceNetCtl_stub -lSceTouch_stub"
+		LIBS="$LIBS -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -lSDL2 -lvita2d -lSceAppMgr_stub -lSceGxm_stub -lSceSysmodule_stub -lSceCtrl_stub -lSceDisplay_stub -lSceCommonDialog_stub -lSceAudio_stub -ldebugnet -lSceNetCtl_stub -lSceTouch_stub -lSceHid_stub -lScePower_stub"
 		LDFLAGS="$LDFLAGS -Wl,-z,nocopyreloc -Wl,-q"
 	fi
 
