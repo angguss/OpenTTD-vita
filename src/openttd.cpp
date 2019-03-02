@@ -70,6 +70,11 @@
 
 #include "safeguards.h"
 
+#if defined(PSVITA)
+// overclocking features
+#include <psp2/power.h>
+#endif
+
 void CallLandscapeTick();
 void IncreaseDate();
 void DoPaletteAnimations();
@@ -100,7 +105,7 @@ void CDECL usererror(const char *s, ...)
 	vseprintf(buf, lastof(buf), s, va);
 	va_end(va);
 
-	sceClibPrintf("usererror: %s\n", buf);
+	//sceClibPrintf("usererror: %s\n", buf);
 }
 
 void CDECL error(const char *s, ...)
@@ -112,7 +117,7 @@ void CDECL error(const char *s, ...)
 	vseprintf(buf, lastof(buf), s, va);
 	va_end(va);
 
-	sceClibPrintf("error: %s\n", buf);
+	//sceClibPrintf("error: %s\n", buf);
 }
 
 void CDECL ShowInfoF(const char *s, ...)
@@ -124,7 +129,7 @@ void CDECL ShowInfoF(const char *s, ...)
 	vseprintf(buf, lastof(buf), s, va);
 	va_end(va);
 
-	sceClibPrintf("ShowInfoF: %s\n", buf);
+	//sceClibPrintf("ShowInfoF: %s\n", buf);
 }
 
 #else
@@ -744,6 +749,10 @@ int openttd_main(int argc, char *argv[])
 	// TODO: Use shared paths here instead of hardcoded.
 	// argv[0] is NULL on vita, will crash
 	DeterminePaths("ux0:/data/openttd/");
+	scePowerSetArmClockFrequency(444);
+    scePowerSetGpuClockFrequency(222);
+    scePowerSetBusClockFrequency(222);
+    scePowerSetGpuXbarClockFrequency(222);
 #else
 	DeterminePaths(argv[0]);
 #endif

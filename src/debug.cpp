@@ -142,7 +142,7 @@ static void debug_print(const char *dbg, const char *buf)
 #elif defined(WIN32) || defined(WIN64)
 		_fputts(OTTD2FS(buffer, true), stderr);
 #elif defined(PSVITA)
-		sceClibPrintf("%s\n", buf);
+		//sceClibPrintf("%s\n", buf);
 #else
 		fputs(buffer, stderr);
 #endif
